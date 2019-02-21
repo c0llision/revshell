@@ -13,7 +13,7 @@
 
 from argparse import ArgumentParser
 from pyperclip import copy as copy_clipboard
-import subprocess
+from subprocess import run, getoutput
 import readline
 import os
 import sys
@@ -28,27 +28,12 @@ def is_valid_ip(address):
     for octet in octets:
         try:
             octet = int(octet)
+            if octet > 255 or octet < 0:
+                return False
         except ValueError:
             return False
 
-        if octet > 255 or octet < 0:
-            return False
-
     return True
-
-
-def get_ip(iface='tun0'):
-    shell_cmd = 'ifconfig {} | grep -m1 "inet"| cut -d" " -f 10'
-
-    address = subprocess.getoutput(shell_cmd.format(iface))
-
-    if not is_valid_ip(address):
-        address = subprocess.getoutput(shell_cmd.format("tap0"))
-
-        if not is_valid_ip(address):
-            address = input("Enter IP address of listening machine: ")
-
-    return address
 
 
 def start_nc():
@@ -56,7 +41,7 @@ def start_nc():
     print("Running nc -lvnp {}".format(args.port))
     print("--------------------------")
     try:
-        subprocess.run("ncat -lvnp" +  str(args.port), shell=True)
+        run("ncat -lvnp" +  str(args.port), shell=True)
     except KeyboardInterrupt:
         exit()
 
@@ -84,8 +69,23 @@ def get_args():
 
 
 def print_help():
-    pass
+    print('help')
 
+
+def get_ip(iface='tun0'):
+    shell_cmd = 'ifconfig {} | grep -m1 "inet"| cut -d" " -f 10'
+
+    for x in [iface, 'tap0', 'wlan0', 'eth0']:
+        address = getoutput(shell_cmd.format(x))
+        if is_valid_ip(address):
+            break
+    else:
+        address = input("Enter IP address of listening machine: ")
+
+    return address
+
+def input_ip():
+    args.ip = input("Enter IP address of listening machine: ")
 
 if __name__=="__main__":
     # Get command line arguments
@@ -116,6 +116,7 @@ if __name__=="__main__":
         user_input = input('> ').lower().strip()
         {
             'q': exit,
+            'ip' :input_ip,
             'nc' :start_nc,
             'h': print_help
         }.get(user_input, copy_shell)()
